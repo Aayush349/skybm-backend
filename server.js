@@ -1,14 +1,20 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const cloudinary = require("cloudinary").v2; // [NEW] Import Cloudinary
 const cors = require("cors");
 require("dotenv").config();
 
 const app = express();
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 /* -------------------- MIDDLEWARE -------------------- */
 app.use(
   cors({
-    origin: "http://localhost:5173", // allow frontend access (lock this later)
+    origin: ["http://localhost:5173", "https://skybm.onrender.com/",""], // allow frontend access (lock this later)
     methods: ["GET", "POST", "PUT", "DELETE"],
   })
 );
@@ -46,6 +52,15 @@ const blogSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+const gallerySchema = new mongoose.Schema({
+  src: { type: String, required: true },       // Cloudinary Secure URL
+  publicId: { type: String, required: true },  // Cloudinary ID (needed for delete)
+  alt: { type: String, default: "Event Image" },
+  createdAt: { type: Date, default: Date.now }
+});
+
+const GalleryImage = mongoose.model("GalleryImage", gallerySchema);
+
 const Blog = mongoose.model("Blog", blogSchema);
 
 /* -------------------- ROUTES -------------------- */
@@ -53,6 +68,54 @@ const Blog = mongoose.model("Blog", blogSchema);
 /* Health check */
 app.get("/", (req, res) => {
   res.json({ status: "API is running" });
+});
+
+// 1. GET ALL IMAGES
+app.get("/api/gallery", async (req, res) => {
+  try {
+    // Sort by newest first
+    const images = await GalleryImage.find().sort({ createdAt: -1 });
+    res.json(images);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to fetch images" });
+  }
+});
+
+// 2. SAVE IMAGE (Called after frontend upload)
+app.post("/api/gallery", async (req, res) => {
+  try {
+    const { src, publicId, alt } = req.body;
+    
+    if (!src || !publicId) {
+      return res.status(400).json({ message: "Missing image data" });
+    }
+
+    const newImage = new GalleryImage({ src, publicId, alt });
+    await newImage.save();
+    
+    res.status(201).json(newImage);
+  } catch (err) {
+    res.status(500).json({ message: "Failed to save image" });
+  }
+});
+
+// 3. DELETE IMAGE (Removes from DB AND Cloudinary)
+app.delete("/api/gallery/:id", async (req, res) => {
+  try {
+    const image = await GalleryImage.findById(req.params.id);
+    if (!image) return res.status(404).json({ message: "Image not found" });
+
+    // Step A: Delete from Cloudinary
+    await cloudinary.uploader.destroy(image.publicId);
+
+    // Step B: Delete from MongoDB
+    await GalleryImage.findByIdAndDelete(req.params.id);
+
+    res.json({ message: "Image deleted successfully" });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Delete failed" });
+  }
 });
 
 /* -------------------- GET ALL BLOGS -------------------- */
