@@ -14,7 +14,7 @@ cloudinary.config({
 /* -------------------- MIDDLEWARE -------------------- */
 app.use(
   cors({
-    origin: ["http://localhost:5173", "https://skybm.onrender.com",""], // allow frontend access (lock this later)
+    origin: ["http://localhost:5173", "https://skybm.onrender.com","https://skybm.in/"], // allow frontend access (lock this later)
     methods: ["GET", "POST", "PUT", "DELETE"],
   })
 );
