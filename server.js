@@ -2,6 +2,8 @@ const express = require("express");
 const mongoose = require("mongoose");
 const cloudinary = require("cloudinary").v2; // [NEW] Import Cloudinary
 const cors = require("cors");
+const https = require("https");
+const http = require("http");
 require("dotenv").config();
 
 const app = express();
@@ -220,9 +222,33 @@ app.delete("/api/blogs/slug/:slug", async (req, res) => {
 
 /* -------------------- SERVER -------------------- */
 const PORT = process.env.PORT || 5000;
-app.listen(PORT, () =>
-  console.log(`🚀 Server running on port ${PORT}`)
-);
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
+
+  // -------------------- KEEP-ALIVE CRON JOB (Every 8 min) -------------------- //
+  // Render free tier spins down after 15 minutes of inactivity.
+  // This cron job hits the blog API every 8 minutes to keep the backend active.
+  const BACKEND_URL = process.env.BACKEND_URL || "https://skybm-backend.onrender.com";
+  const EIGHT_MINUTES = 8 * 60 * 1000; // 480,000 ms
+
+  const pingBlogApi = () => {
+    const url = `${BACKEND_URL}/api/blogs`;
+    const client = url.startsWith("https") ? https : http;
+
+    client
+      .get(url, (res) => {
+        console.log(`[Keep-Alive Cron] Pinged ${url} - Status: ${res.statusCode} (${new Date().toLocaleTimeString()})`);
+      })
+      .on("error", (err) => {
+        console.error(`[Keep-Alive Cron] Ping failed:`, err.message);
+      });
+  };
+
+  // Initial ping 10 seconds after server starts, then repeats every 8 minutes
+  setTimeout(pingBlogApi, 10000);
+  setInterval(pingBlogApi, EIGHT_MINUTES);
+  console.log(`⏱️ Keep-alive cron scheduled to ping ${BACKEND_URL}/api/blogs every 8 minutes.`);
+});
 
 
 
