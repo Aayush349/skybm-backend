@@ -4,6 +4,7 @@ const cloudinary = require("cloudinary").v2; // [NEW] Import Cloudinary
 const cors = require("cors");
 const https = require("https");
 const http = require("http");
+const crypto = require("crypto");
 require("dotenv").config();
 
 const app = express();
@@ -141,6 +142,26 @@ app.get("/api/blogs/:slug", async (req, res) => {
   } catch {
     res.status(500).json({ message: "Error fetching blog" });
   }
+});
+
+/* -------------------- ADMIN LOGIN -------------------- */
+app.post("/api/admin/login", (req, res) => {
+  const { email, password } = req.body;
+
+  const ADMIN_EMAIL = process.env.ADMIN_EMAIL || "admin7894@gmail.com";
+  const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || "789123456";
+
+  if (!email || !password) {
+    return res.status(400).json({ success: false, message: "Email and password are required" });
+  }
+
+  if (email === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
+    // Generate a simple session token
+    const token = crypto.randomBytes(32).toString("hex");
+    return res.json({ success: true, token, message: "Login successful" });
+  }
+
+  return res.status(401).json({ success: false, message: "Invalid email or password" });
 });
 
 /* -------------------- ADMIN BLOG LIST -------------------- */
